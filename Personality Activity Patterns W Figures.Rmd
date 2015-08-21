@@ -1,0 +1,118 @@
+---
+title: "Quantification of Correct Personal Activity Patterns"
+author: "Ravi Shankar"
+date: "Thursday, August 20, 2015"
+output: html_document
+---
+```{r global_options, cache=FALSE, include=FALSE,echo=FALSE, Warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/')
+```
+### Executive Summary
+##### Urgulino et al [2012] collected data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.  The training ('train') data consists of 19622 data sets from these 6 participants performing one correct pattern ("A") and five incorrect patterns ("B" to "E"). We are asked to classify 20 testing ('test') data sets with unknown patterns. Our algorithm correctly identified 19 of the 20 test cases, inline with the accuracy of 96.6% obtained in cross-validation. Figures included at the end are from initial exploration, prior to focusing on principal component analysis and the KNN clustering algorithm. They are included to show due diligence. 
+```{r, init, include=FALSE, echo=FALSE, Warning=FALSE, message=FALSE}
+library(caret); library(e1071); library(ggplot2);
+library(rattle); library(rpart.plot); library(RGtk2)
+```
+##### Following libraries were used: caret, e1071, and ggplot2. The following libraries were also used, especialy for the figures at the end: rattle, rpart.plot, and RGtk2.
+### Method
+#####  We first cleaned the  'train' dataset to lead to a dataset with 53 variables and 1 outcome ('classe'). Similar cleaniong of 'test' data led to a dataset with 53 variables and 1 blank column ('problem_id') for the output to be predicted. The final 'cleaned' data sets are called 'training' and 'testing', respectively. See below for the code. 
+
+```{r, clean, results='hide'}
+test <- read.csv("pml-testing.csv", header=TRUE)
+train <- read.csv("pml-training.csv", header=TRUE)
+dim(train); dim(test)
+# remove NA columns
+train.sub <- train[,colSums(is.na(train)) != nrow(train) ]
+test.sub <- test[,colSums(is.na(test)) != nrow(test) ]
+# check that number of columns left is the same
+dim(train.sub); dim(test.sub)
+# remove the "yes" rows
+train.s <- train[train$new_window=="no",]
+train.sub <- train.s[,colSums(is.na(train.s)) != nrow(train.s)]
+dim(train.sub)
+# remove columns with blank entries
+train.sub2 <- train.sub[,colSums((train.sub=="")) != nrow(train.sub) ]
+test.sub2 <- test.sub[,colSums( (test.sub=="")) != nrow(test.sub) ]
+dim(train.sub2); dim(test.sub2)
+# verify that the colnames are the same
+names(train.sub2)== names(test.sub2)
+names(train.sub2)[60]
+names(test.sub2)[60]
+# remove large redundant files
+rm(test); rm(train)
+rm(test.sub); rm(train.sub)
+rm(train.s)
+# now we have cleaned data sets - rename them
+testing <- test.sub2
+training <- train.sub2
+rm(test.sub2); rm(train.sub2)
+```
+##### The resuling 'training' data subset was then split into two sets for cross-validation purposes, with a split of 0.80 (for 'training') and 0.20 (for 'validation'). Correlation matrix showed that 38 of the variables in the training data had correlations of 0.8 or better with at least another variable in that subgroup. Columns with info on time and date were also removed. The resulting data sets are entitled 'TrainData', 'ValidData', and 'TestData.' See below for the code and results. 
+
+```{r, setup}
+set.seed(32343)
+InTrain <- createDataPartition(y=training$classe, p=0.8, list=FALSE)
+train.set <- training[InTrain,]
+valid.set <- training[-InTrain,]
+dim(train.set); dim(valid.set)
+# remove time and date info from the sets
+TrainData <- train.set[,-1:-6]
+dim(TrainData)
+#M <- abs(cor(TrainData[,-54]))
+#diag(M) <- 0
+#which(M > 0.8,arr.ind=T)
+ValidData <- valid.set[,-1:-6]
+dim(ValidData)
+TestData <- testing[,-1:-6]
+dim(TestData)
+#remove unessential datasets
+rm(testing); rm(train.set); rm(valid.set); rm(training) 
+```
+
+#####It was decided to use principal component analysis to identify orthogonal intermediate variables and use them in the model fit. The threshold was set to 0.95 which picked the top 25 principal components (PCs). This reduced the complexity of the computation, while reducing the risk of overfitting. The choice of 'pca' in the preProcess method automatically scales and centers the individual variables so larger range variables do not influence the KNN clustering algorithm that was invoked in a later step. The predict method was then used to tranform the raw data variables of the training data to a new set of variables comprised of these PCs.  The train method was then used to build a modelfit on this new data set for the KNN clustering method. The modelfit was evaluated on the 'validation' data (after it had been subject to the predict method to secure a dataset with 25 PCs). Resulting confusion matrix yielded an accuracy of 0.966, with the CI of (0.960, 0.972). Specificity  and Sensitivity  for all the five pattern classes were uniformly high, respectively at 0.99 and 0.94 (or above). See below for code and results. 
+
+```{r, validate}
+# Method 2: From Professor's Week 3, first lecture
+table(TrainData$classe)
+table(ValidData$classe)
+table(TestData[54])
+#Preprocessing for PCA
+preProc <- preProcess(TrainData[,-54],method="pca",thresh=0.95)
+trainPC <- predict(preProc,TrainData[,-54])
+modelFit <- train(TrainData$classe ~ .,method="knn",data=trainPC)
+validPC <- predict(preProc,ValidData[,-54])
+confusionMatrix(ValidData$classe,predict(modelFit,validPC))
+```
+
+#####The split was changed to 0.95 (for 'training') and 0.05 (for 'validation') and the process repeated. The computation took significantly longer (25 minutes vs 10 minutes) with marginal increase in accuracy (to 0.979). Specificity and sensitivity also improved slightly. This also verified that the model was a stable and repeatable model fit. Results for this are not shown. 
+
+###Model: Lists the rules used in clustering
+```{r, model}
+modFit <- train(TrainData$classe ~ .,method="rpart",data=trainPC)
+print(modFit$finalModel)
+```
+
+
+###Results: 
+#####The Testing data ('TestData') was then preprocessed with the predict method to obtain the data in terms of the 25 PCs and the predict method was invoked again to predict or estimate the unknown pattern codes. This was repeated with the model fits obtained with both the splits. Both yielded the same prediction values ('value'). These were submitted at the Coursera site. The submission record showed that 19 of the 20 were predicted right, thus matching well the accuracy predicted above (of at least 0.96). 
+
+```{r, predict}
+testPC <- predict(preProc,TestData[,-54])
+value <- predict(modelFit, testPC)
+value
+```
+
+###Reference: 
+#####Ugulino, W. et al. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proc. of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. 
+
+###Figures 
+##### Figure 1: The Classification Tree
+```{r, warning=FALSE, message=FALSE, echo=FALSE, fig.width=8, fig.height=6}
+plot(modFit$finalModel, uniform=TRUE,main="Classification Tree")
+text(modFit$finalModel, use.n=TRUE, all=TRUE, cex=.8)
+```
+##### Figure 2:  Better Illustrated Classification Tree
+```{r, warning=FALSE, message=FALSE, echo=FALSE, fig.width=8, fig.height=6}
+fancyRpartPlot(modFit$finalModel)
+```
+
