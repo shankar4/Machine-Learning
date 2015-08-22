@@ -9,7 +9,8 @@ Please note: There is a cache folder: Pattern_Activity_Patterns_cache/html - THI
 
 I ran out of time to set up a gh-page to showcase the .html file. However, I used the Github automatic webpage generator to generate a webpage (which is also called a gh-pages branch). 
 
-My partially useful gh-page is  located here:
+My partially useful gh-page is  located here: http://shankar4.github.io/Machine-Learning/ 
+
 You will be able to download the zip directly from this page. Sorry, publishing the html page was not achieved. 
 
 Thanks!
