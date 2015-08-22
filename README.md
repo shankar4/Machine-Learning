@@ -11,6 +11,6 @@ I ran out of time to set up a gh-page to showcase the .html file. However, I use
 
 My partially useful gh-page is  located here: http://shankar4.github.io/Machine-Learning/ 
 
-You will be able to download the zip directly from this repo (note the 'Download ZIP' button on the right hand side) or the web page (gh-page) listed above. Sorry, the gh-page does not showcase the .html file(ran out of time) 
+You will be able to download the zip directly from this repo page (note the 'Download ZIP' button on the right hand side, in line with the label 'READEME.md') or the web page (gh-page) listed above. Sorry, the gh-page does not showcase the .html file (ran out of time) 
 
 Thanks!
